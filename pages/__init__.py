@@ -1,0 +1,38 @@
+# pages/__init__.py — Page registry
+from pages import (
+    home,
+    ai_assistant,
+    notes,
+    tasks,
+    pomodoro,
+    flashcards,
+    data_explorer,
+    math_solver,
+    converter,
+    password_gen,
+    color_tools,
+    budget,
+    qr_generator,
+    text_tools,
+    habit_tracker,
+    ocr,
+)
+
+PAGE_MAP = {
+    "Home": home.render,
+    "AI Assistant": ai_assistant.render,
+    "Smart Notes": notes.render,
+    "Task Manager": tasks.render,
+    "Pomodoro": pomodoro.render,
+    "Flashcards": flashcards.render,
+    "Data Explorer": data_explorer.render,
+    "Math Solver": math_solver.render,
+    "Converter": converter.render,
+    "Password Gen": password_gen.render,
+    "Color Tools": color_tools.render,
+    "Budget Tracker": budget.render,
+    "QR Generator": qr_generator.render,
+    "Text Tools": text_tools.render,
+    "Habit Tracker": habit_tracker.render,
+    "OCR Scanner": ocr.render,
+}
