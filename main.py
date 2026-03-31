@@ -570,9 +570,6 @@ if st.session_state.page == "Home":
 
 # ════════════════════════════════════════════════════════════════════════════════
 # AI ASSISTANT
-# NOTE: The original code was missing the x-api-key header — Claude API
-# requests in the browser go through Anthropic's proxy via the artifact system.
-# In a Streamlit deployment, you'd set ANTHROPIC_API_KEY in environment.
 # ════════════════════════════════════════════════════════════════════════════════
 elif st.session_state.page == "AI Assistant":
     page_header("🤖 AI Assistant", "Powered by Claude — ask anything")
@@ -651,8 +648,9 @@ elif st.session_state.page == "AI Assistant":
             if api_key:
                 headers["x-api-key"] = api_key
                 headers["anthropic-version"] = "2023-06-01"
+            # Keep last 20 messages to avoid context overflow
             messages = [{"role": m["role"], "content": m["content"]}
-                        for m in st.session_state.chat_history]
+                        for m in st.session_state.chat_history[-20:]]
             resp = req.post(
                 "https://api.anthropic.com/v1/messages",
                 headers=headers,
@@ -873,9 +871,6 @@ elif st.session_state.page == "Task Manager":
 
 # ════════════════════════════════════════════════════════════════════════════════
 # POMODORO
-# NOTE: time.sleep(1) + st.rerun() is the only way to auto-update in Streamlit.
-# We keep it but add a guard so it only runs when the timer is active and
-# not already expired, avoiding infinite loops.
 # ════════════════════════════════════════════════════════════════════════════════
 elif st.session_state.page == "Pomodoro":
     page_header("⏱️ Pomodoro Timer", "Deep focus with structured breaks")
@@ -1891,7 +1886,7 @@ elif st.session_state.page == "Budget Tracker":
             df_budget = pd.DataFrame(items)
 
             with tab_log:
-                for item in reversed(items[-25:]):
+                for j, item in enumerate(reversed(items[-25:])):
                     color  = "#22c55e" if "Income" in item["type"] else "#f43f5e"
                     sign   = "+" if "Income" in item["type"] else "-"
                     desc   = f" · {item['desc']}" if item.get("desc") else ""
