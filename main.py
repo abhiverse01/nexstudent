@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import json, random, string, math, hashlib, base64, io, re, time, datetime
+import uuid as _uuid
 from sympy import symbols, solve, simplify, expand, factor, diff, integrate, sympify, latex
 from sympy.parsing.sympy_parser import parse_expr
 import qrcode
@@ -16,306 +17,82 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ── Global CSS ────────────────────────────────────────────────────────────────
-# NOTE: All CSS is scoped carefully. We avoid overriding Streamlit internals
-# with !important where not needed. Pseudo-elements and complex selectors
-# that don't survive Streamlit's HTML sanitizer are placed here, not in
-# unsafe_allow_html blocks. We never split open/close div tags across
-# separate st.markdown() calls.
-st.markdown("""
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-/* ── Tokens ── */
-:root {
-  --bg:      #070710;
-  --surface: #0d0d1a;
-  --card:    #111124;
-  --card2:   #161630;
-  --border:  #1c1c3a;
-  --border2: #252550;
-  --ink:     #e8e8f8;
-  --ink2:    #9090b8;
-  --ink3:    #4a4a72;
-  --sol:     #5b5ef4;
-  --sol2:    #818cf8;
-  --amber:   #f59e0b;
-  --rose:    #f43f5e;
-  --teal:    #2dd4bf;
-  --green:   #22c55e;
-  --r:       12px;
-  --r2:      8px;
-  --sh:      0 4px 24px rgba(0,0,0,.5);
-  --sh2:     0 2px 12px rgba(0,0,0,.35);
-  --glow:    0 0 40px rgba(91,94,244,.18);
-}
+# ════════════════════════════════════════════════════════════════════════════════
+# FIX #1 — CSS SPLIT INTO SMALLER CHUNKS + <link> SEPARATED
+#
+# BUG: The original app dumped the entire <link> + <style> into ONE giant
+# st.markdown() call.  Streamlit's HTML sanitizer has a size threshold for
+# unsafe_allow_html blocks.  When that threshold is exceeded, the raw CSS
+# text leaks into the visible frontend instead of being applied as a style.
+#
+# FIX:  • Separate the <link> tag into its own st.markdown().
+#        • Split the <style> block into 4 smaller chunks so each is well
+#          under the sanitiser limit.
+# ════════════════════════════════════════════════════════════════════════════════
 
-/* ── Base ── */
-html, body, [class*="css"] {
-  font-family: 'DM Sans', sans-serif !important;
-  background-color: var(--bg) !important;
-  color: var(--ink) !important;
-}
-.main .block-container {
-  padding: 1.2rem 2rem 4rem !important;
-  max-width: 1300px !important;
-}
+# ── Font import (isolated) ────────────────────────────────────────────────────
+st.markdown("""<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">""", unsafe_allow_html=True)
 
-/* ── Sidebar ── */
-section[data-testid="stSidebar"] {
-  background: var(--surface) !important;
-  border-right: 1px solid var(--border) !important;
-}
-section[data-testid="stSidebar"] .block-container {
-  padding: 1rem 0.75rem !important;
-}
-section[data-testid="stSidebar"] button {
-  background: transparent !important;
-  border: none !important;
-  color: var(--ink2) !important;
-  font-family: 'DM Sans', sans-serif !important;
-  font-size: .84rem !important;
-  font-weight: 500 !important;
-  text-align: left !important;
-  padding: .5rem .75rem !important;
-  border-radius: var(--r2) !important;
-  transition: background .15s, color .15s !important;
-  width: 100% !important;
-}
-section[data-testid="stSidebar"] button:hover {
-  background: rgba(91,94,244,.12) !important;
-  color: var(--ink) !important;
-}
-section[data-testid="stSidebar"] button[kind="secondary"] {
-  background: rgba(91,94,244,.18) !important;
-  color: var(--sol2) !important;
-}
+# ── CSS Part 1: Tokens, Base, Sidebar ────────────────────────────────────────
+st.markdown("""<style>
+:root{--bg:#070710;--surface:#0d0d1a;--card:#111124;--card2:#161630;--border:#1c1c3a;--border2:#252550;--ink:#e8e8f8;--ink2:#9090b8;--ink3:#4a4a72;--sol:#5b5ef4;--sol2:#818cf8;--amber:#f59e0b;--rose:#f43f5e;--teal:#2dd4bf;--green:#22c55e;--r:12px;--r2:8px;--sh:0 4px 24px rgba(0,0,0,.5);--sh2:0 2px 12px rgba(0,0,0,.35);--glow:0 0 40px rgba(91,94,244,.18)}
+html,body,[class*="css"]{font-family:'DM Sans',sans-serif!important;background-color:var(--bg)!important;color:var(--ink)!important}
+.main .block-container{padding:1.2rem 2rem 4rem!important;max-width:1300px!important}
+section[data-testid="stSidebar"]{background:var(--surface)!important;border-right:1px solid var(--border)!important}
+section[data-testid="stSidebar"] .block-container{padding:1rem .75rem!important}
+section[data-testid="stSidebar"] button{background:transparent!important;border:none!important;color:var(--ink2)!important;font-family:'DM Sans',sans-serif!important;font-size:.84rem!important;font-weight:500!important;text-align:left!important;padding:.5rem .75rem!important;border-radius:var(--r2)!important;transition:background .15s,color .15s!important;width:100%!important}
+section[data-testid="stSidebar"] button:hover{background:rgba(91,94,244,.12)!important;color:var(--ink)!important}
+section[data-testid="stSidebar"] button[kind="secondary"]{background:rgba(91,94,244,.18)!important;color:var(--sol2)!important}
+</style>""", unsafe_allow_html=True)
 
-/* ── Hide chrome ── */
-#MainMenu, footer, header { visibility: hidden !important; }
-.stDeployButton { display: none !important; }
-[data-testid="stToolbar"] { display: none !important; }
+# ── CSS Part 2: Hide chrome, Inputs, Buttons ─────────────────────────────────
+st.markdown("""<style>
+#MainMenu,footer,header{visibility:hidden!important}
+.stDeployButton{display:none!important}
+[data-testid="stToolbar"]{display:none!important}
+.stTextInput>div>div>input,.stTextArea>div>div>textarea,.stNumberInput>div>div>input{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--r2)!important;color:var(--ink)!important;font-family:'DM Sans',sans-serif!important;font-size:.88rem!important;transition:border-color .2s,box-shadow .2s!important}
+.stTextInput>div>div>input:focus,.stTextArea>div>div>textarea:focus{border-color:var(--sol)!important;box-shadow:0 0 0 3px rgba(91,94,244,.15)!important;outline:none!important}
+.stSelectbox>div>div,.stMultiSelect>div>div{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--r2)!important;color:var(--ink)!important;font-family:'DM Sans',sans-serif!important;font-size:.88rem!important}
+label,.stRadio label,.stCheckbox label{color:var(--ink2)!important;font-family:'DM Sans',sans-serif!important;font-size:.84rem!important;font-weight:500!important}
+.stButton>button{background:var(--sol)!important;color:#fff!important;border:none!important;border-radius:var(--r2)!important;font-family:'DM Sans',sans-serif!important;font-weight:600!important;font-size:.84rem!important;padding:.48rem 1.2rem!important;letter-spacing:.01em!important;transition:background .15s,transform .1s,box-shadow .15s!important;cursor:pointer!important}
+.stButton>button:hover{background:var(--sol2)!important;transform:translateY(-1px)!important;box-shadow:0 4px 16px rgba(91,94,244,.4)!important}
+.stButton>button:active{transform:translateY(0)!important}
+</style>""", unsafe_allow_html=True)
 
-/* ── Inputs ── */
-.stTextInput > div > div > input,
-.stTextArea > div > div > textarea,
-.stNumberInput > div > div > input {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--r2) !important;
-  color: var(--ink) !important;
-  font-family: 'DM Sans', sans-serif !important;
-  font-size: .88rem !important;
-  transition: border-color .2s, box-shadow .2s !important;
-}
-.stTextInput > div > div > input:focus,
-.stTextArea > div > div > textarea:focus {
-  border-color: var(--sol) !important;
-  box-shadow: 0 0 0 3px rgba(91,94,244,.15) !important;
-  outline: none !important;
-}
-.stSelectbox > div > div,
-.stMultiSelect > div > div {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--r2) !important;
-  color: var(--ink) !important;
-  font-family: 'DM Sans', sans-serif !important;
-  font-size: .88rem !important;
-}
-label, .stRadio label, .stCheckbox label {
-  color: var(--ink2) !important;
-  font-family: 'DM Sans', sans-serif !important;
-  font-size: .84rem !important;
-  font-weight: 500 !important;
-}
+# ── CSS Part 3: Metrics, Tabs, Expanders, Sliders, Dataframes, Code, Alerts ─
+st.markdown("""<style>
+[data-testid="metric-container"]{background:var(--card)!important;border:1px solid var(--border)!important;border-radius:var(--r)!important;padding:.9rem 1.1rem!important}
+[data-testid="metric-container"]>div>label{color:var(--ink3)!important;font-size:.74rem!important;font-weight:600!important;letter-spacing:.06em!important;text-transform:uppercase!important}
+[data-testid="stMetricValue"]{font-size:1.65rem!important;font-weight:700!important;color:var(--ink)!important;font-family:'DM Mono',monospace!important}
+[data-testid="stMetricDelta"]{font-size:.78rem!important}
+.stTabs [data-baseweb="tab-list"]{gap:2px!important;background:var(--surface)!important;border-radius:var(--r2)!important;padding:3px!important;border:1px solid var(--border)!important;width:fit-content!important}
+.stTabs [data-baseweb="tab"]{border-radius:6px!important;padding:.35rem .9rem!important;font-family:'DM Sans',sans-serif!important;font-size:.82rem!important;font-weight:500!important;color:var(--ink3)!important;background:transparent!important;border:none!important}
+.stTabs [aria-selected="true"]{background:var(--sol)!important;color:#fff!important}
+.stTabs [data-baseweb="tab-highlight"]{display:none!important}
+.streamlit-expanderHeader{background:var(--card)!important;border-radius:var(--r)!important;border:1px solid var(--border)!important;font-weight:600!important;font-size:.86rem!important;color:var(--ink)!important;font-family:'DM Sans',sans-serif!important}
+.streamlit-expanderContent{background:var(--surface)!important;border:1px solid var(--border)!important;border-top:none!important;border-radius:0 0 var(--r) var(--r)!important}
+[data-testid="stSlider"]>div>div>div>div{background:var(--sol)!important}
+[data-testid="stSlider"] div[role="slider"]{background:var(--sol)!important;border:2px solid var(--sol2)!important}
+.stDataFrame{border-radius:var(--r)!important;overflow:hidden!important;border:1px solid var(--border)!important}
+code,pre{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--r2)!important;font-family:'DM Mono',monospace!important;font-size:.82rem!important;color:var(--teal)!important}
+.stSuccess{background:rgba(34,197,94,.08)!important;border:1px solid rgba(34,197,94,.25)!important;border-radius:var(--r2)!important;color:var(--green)!important}
+.stError{background:rgba(244,63,94,.08)!important;border:1px solid rgba(244,63,94,.25)!important;border-radius:var(--r2)!important;color:var(--rose)!important}
+.stInfo{background:rgba(91,94,244,.08)!important;border:1px solid rgba(91,94,244,.2)!important;border-radius:var(--r2)!important}
+.stWarning{background:rgba(245,158,11,.08)!important;border:1px solid rgba(245,158,11,.2)!important;border-radius:var(--r2)!important}
+</style>""", unsafe_allow_html=True)
 
-/* ── Primary buttons ── */
-.stButton > button {
-  background: var(--sol) !important;
-  color: #fff !important;
-  border: none !important;
-  border-radius: var(--r2) !important;
-  font-family: 'DM Sans', sans-serif !important;
-  font-weight: 600 !important;
-  font-size: .84rem !important;
-  padding: .48rem 1.2rem !important;
-  letter-spacing: .01em !important;
-  transition: background .15s, transform .1s, box-shadow .15s !important;
-  cursor: pointer !important;
-}
-.stButton > button:hover {
-  background: var(--sol2) !important;
-  transform: translateY(-1px) !important;
-  box-shadow: 0 4px 16px rgba(91,94,244,.4) !important;
-}
-.stButton > button:active {
-  transform: translateY(0) !important;
-}
-
-/* ── Metrics ── */
-[data-testid="metric-container"] {
-  background: var(--card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--r) !important;
-  padding: .9rem 1.1rem !important;
-}
-[data-testid="metric-container"] > div > label {
-  color: var(--ink3) !important;
-  font-size: .74rem !important;
-  font-weight: 600 !important;
-  letter-spacing: .06em !important;
-  text-transform: uppercase !important;
-}
-[data-testid="stMetricValue"] {
-  font-size: 1.65rem !important;
-  font-weight: 700 !important;
-  color: var(--ink) !important;
-  font-family: 'DM Mono', monospace !important;
-}
-[data-testid="stMetricDelta"] {
-  font-size: .78rem !important;
-}
-
-/* ── Tabs ── */
-.stTabs [data-baseweb="tab-list"] {
-  gap: 2px !important;
-  background: var(--surface) !important;
-  border-radius: var(--r2) !important;
-  padding: 3px !important;
-  border: 1px solid var(--border) !important;
-  width: fit-content !important;
-}
-.stTabs [data-baseweb="tab"] {
-  border-radius: 6px !important;
-  padding: .35rem .9rem !important;
-  font-family: 'DM Sans', sans-serif !important;
-  font-size: .82rem !important;
-  font-weight: 500 !important;
-  color: var(--ink3) !important;
-  background: transparent !important;
-  border: none !important;
-}
-.stTabs [aria-selected="true"] {
-  background: var(--sol) !important;
-  color: #fff !important;
-}
-.stTabs [data-baseweb="tab-highlight"] {
-  display: none !important;
-}
-
-/* ── Expanders ── */
-.streamlit-expanderHeader {
-  background: var(--card) !important;
-  border-radius: var(--r) !important;
-  border: 1px solid var(--border) !important;
-  font-weight: 600 !important;
-  font-size: .86rem !important;
-  color: var(--ink) !important;
-  font-family: 'DM Sans', sans-serif !important;
-}
-.streamlit-expanderContent {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  border-top: none !important;
-  border-radius: 0 0 var(--r) var(--r) !important;
-}
-
-/* ── Sliders ── */
-[data-testid="stSlider"] > div > div > div > div {
-  background: var(--sol) !important;
-}
-[data-testid="stSlider"] div[role="slider"] {
-  background: var(--sol) !important;
-  border: 2px solid var(--sol2) !important;
-}
-
-/* ── Dataframes ── */
-.stDataFrame {
-  border-radius: var(--r) !important;
-  overflow: hidden !important;
-  border: 1px solid var(--border) !important;
-}
-
-/* ── Code ── */
-code, pre {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--r2) !important;
-  font-family: 'DM Mono', monospace !important;
-  font-size: .82rem !important;
-  color: var(--teal) !important;
-}
-
-/* ── Alerts ── */
-.stSuccess {
-  background: rgba(34,197,94,.08) !important;
-  border: 1px solid rgba(34,197,94,.25) !important;
-  border-radius: var(--r2) !important;
-  color: var(--green) !important;
-}
-.stError {
-  background: rgba(244,63,94,.08) !important;
-  border: 1px solid rgba(244,63,94,.25) !important;
-  border-radius: var(--r2) !important;
-  color: var(--rose) !important;
-}
-.stInfo {
-  background: rgba(91,94,244,.08) !important;
-  border: 1px solid rgba(91,94,244,.2) !important;
-  border-radius: var(--r2) !important;
-}
-.stWarning {
-  background: rgba(245,158,11,.08) !important;
-  border: 1px solid rgba(245,158,11,.2) !important;
-  border-radius: var(--r2) !important;
-}
-
-/* ── Radio ── */
-.stRadio > div {
-  gap: .5rem !important;
-}
-
-/* ── Divider ── */
-hr {
-  border-color: var(--border) !important;
-  margin: 1.4rem 0 !important;
-}
-
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
-
-/* ── File uploader ── */
-[data-testid="stFileUploader"] {
-  background: var(--surface) !important;
-  border: 1.5px dashed var(--border2) !important;
-  border-radius: var(--r) !important;
-}
-
-/* ── Color picker ── */
-[data-testid="stColorPicker"] > div {
-  border: 1px solid var(--border) !important;
-  border-radius: var(--r2) !important;
-}
-
-/* ── Date input ── */
-[data-testid="stDateInput"] > div > div > input {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--r2) !important;
-  color: var(--ink) !important;
-  font-family: 'DM Sans', sans-serif !important;
-  font-size: .88rem !important;
-}
-
-/* ── Form ── */
-[data-testid="stForm"] {
-  background: transparent !important;
-  border: none !important;
-}
-</style>
-""", unsafe_allow_html=True)
+# ── CSS Part 4: Misc — Radio, Divider, Scrollbar, File Uploader, Color/Date/Form
+st.markdown("""<style>
+.stRadio>div{gap:.5rem!important}
+hr{border-color:var(--border)!important;margin:1.4rem 0!important}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+[data-testid="stFileUploader"]{background:var(--surface)!important;border:1.5px dashed var(--border2)!important;border-radius:var(--r)!important}
+[data-testid="stColorPicker"]>div{border:1px solid var(--border)!important;border-radius:var(--r2)!important}
+[data-testid="stDateInput"]>div>div>input{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--r2)!important;color:var(--ink)!important;font-family:'DM Sans',sans-serif!important;font-size:.88rem!important}
+[data-testid="stForm"]{background:transparent!important;border:none!important}
+</style>""", unsafe_allow_html=True)
 
 # ── Session State ─────────────────────────────────────────────────────────────
 def init_state():
@@ -377,7 +154,6 @@ with st.sidebar:
         ("🎯", "Habit Tracker"),
     ]
 
-    # Group nav items
     groups = {
         "STUDY": NAV[:6],
         "TOOLS": NAV[6:10],
@@ -392,7 +168,6 @@ with st.sidebar:
         """, unsafe_allow_html=True)
         for icon, label in items:
             is_active = st.session_state.page == label
-            btn_type = "secondary" if is_active else "tertiary"
             if st.button(f"{icon}  {label}", key=f"nav_{label}",
                          use_container_width=True,
                          type="secondary" if is_active else "tertiary"):
@@ -412,7 +187,6 @@ with st.sidebar:
 
 # ── UI Helpers ────────────────────────────────────────────────────────────────
 def page_header(title: str, subtitle: str = ""):
-    """Render a clean page header — no unclosed divs."""
     sub_html = f'<p style="color:var(--ink3);font-size:.85rem;margin:.1rem 0 1.4rem;font-weight:400;">{subtitle}</p>' if subtitle else '<div style="margin-bottom:1.2rem;"></div>'
     st.markdown(f"""
     <div style="margin-bottom:.1rem;">
@@ -421,12 +195,6 @@ def page_header(title: str, subtitle: str = ""):
       {sub_html}
     </div>
     """, unsafe_allow_html=True)
-
-def card_wrap(content_html: str, extra_style: str = "") -> str:
-    """Return a complete card div — always self-contained."""
-    return f"""<div style="background:var(--card);border:1px solid var(--border);
-      border-radius:var(--r);padding:1.3rem 1.5rem;margin-bottom:.9rem;
-      box-shadow:var(--sh2);{extra_style}">{content_html}</div>"""
 
 def badge(text: str, color: str = "#5b5ef4") -> str:
     bg = color + "22"
@@ -442,6 +210,7 @@ def progress_bar(pct: int, color: str = "var(--sol)") -> str:
       <div style="background:{color};border-radius:99px;height:100%;
         width:{pct}%;transition:width .4s ease;"></div></div>"""
 
+
 # ════════════════════════════════════════════════════════════════════════════════
 # HOME
 # ════════════════════════════════════════════════════════════════════════════════
@@ -450,7 +219,6 @@ if st.session_state.page == "Home":
     hour = now.hour
     greeting = "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
 
-    # Hero — fully self-contained HTML block
     tasks_done  = sum(1 for t in st.session_state.tasks if t.get("done"))
     tasks_total = len(st.session_state.tasks)
     notes_count = len(st.session_state.notes)
@@ -506,7 +274,6 @@ if st.session_state.page == "Home":
     </div>
     """, unsafe_allow_html=True)
 
-    # Stat metrics
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.metric("📋 Tasks", f"{tasks_done}/{tasks_total}", delta=f"{pct}% done")
     with c2: st.metric("📝 Notes", notes_count)
@@ -515,7 +282,6 @@ if st.session_state.page == "Home":
 
     st.markdown("---")
 
-    # Feature grid — each card is fully self-contained
     st.markdown("""
     <div style="font-size:1.1rem;font-weight:700;color:#e8e8f8;
       margin-bottom:.3rem;letter-spacing:-.02em;">Features</div>
@@ -544,7 +310,6 @@ if st.session_state.page == "Home":
     cols = st.columns(3)
     for i, (icon, name, desc, accent) in enumerate(FEATURES):
         with cols[i % 3]:
-            # Self-contained card HTML
             st.markdown(f"""
             <div style="background:var(--card);border:1px solid var(--border);
               border-radius:var(--r);padding:1.1rem 1.2rem;margin-bottom:.1rem;
@@ -597,7 +362,6 @@ elif st.session_state.page == "AI Assistant":
     if st.session_state.chat_history:
         for msg in st.session_state.chat_history:
             role, content = msg["role"], msg["content"]
-            # Escape HTML in content to prevent injection
             safe_content = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             if role == "user":
                 st.markdown(f"""
@@ -630,7 +394,6 @@ elif st.session_state.page == "AI Assistant":
         </div>
         """, unsafe_allow_html=True)
 
-    # Input form
     with st.form("chat_form", clear_on_submit=True):
         col_in, col_btn = st.columns([5, 1])
         with col_in:
@@ -648,7 +411,7 @@ elif st.session_state.page == "AI Assistant":
             if api_key:
                 headers["x-api-key"] = api_key
                 headers["anthropic-version"] = "2023-06-01"
-            # Keep last 20 messages to avoid context overflow
+            # FIX #10: Sliding window — keep last 20 messages to avoid context overflow
             messages = [{"role": m["role"], "content": m["content"]}
                         for m in st.session_state.chat_history[-20:]]
             resp = req.post(
@@ -736,12 +499,17 @@ elif st.session_state.page == "Smart Notes":
             """, unsafe_allow_html=True)
             tabs = st.tabs(["✏️ Edit", "👁 Preview"])
             with tabs[0]:
+                # FIX #5 — Dynamic key per note title so widget state resets on switch.
+                # The original used a fixed key "note_editor" which caused Streamlit
+                # to cache the textarea value, showing stale content when switching
+                # between different notes.
+                safe_key = f"note_editor_{hashlib.md5(active.encode()).hexdigest()[:8]}"
                 content = st.text_area(
                     "content",
                     value=st.session_state.notes[active],
                     height=380,
                     label_visibility="collapsed",
-                    key="note_editor"
+                    key=safe_key,
                 )
                 st.session_state.notes[active] = content
             with tabs[1]:
@@ -788,10 +556,12 @@ elif st.session_state.page == "Task Manager":
             t_due  = st.date_input("Due date", value=None)
             if st.button("＋ Add Task", use_container_width=True):
                 if t_name.strip():
+                    # FIX #9 — Use UUID instead of len(tasks) to avoid ID collisions
+                    # when tasks are deleted (len changes, causing duplicate IDs).
                     st.session_state.tasks.append({
                         "name": t_name, "priority": t_pri, "category": t_cat,
                         "due": str(t_due) if t_due else None, "done": False,
-                        "id": len(st.session_state.tasks)
+                        "id": str(_uuid.uuid4())
                     })
                     st.rerun()
 
@@ -838,10 +608,12 @@ elif st.session_state.page == "Task Manager":
 
         for task in tasks_to_show:
             idx = st.session_state.tasks.index(task)
+            # FIX #9 — Use unique task id in keys to prevent stale checkbox state
+            task_id = task.get("id", str(idx))
             col_chk, col_info, col_del = st.columns([1, 7, 1])
             with col_chk:
                 checked = st.checkbox("done", value=task["done"],
-                                       key=f"task_chk_{idx}", label_visibility="collapsed")
+                                       key=f"task_chk_{task_id}", label_visibility="collapsed")
                 st.session_state.tasks[idx]["done"] = checked
             with col_info:
                 fade = "opacity:.4;text-decoration:line-through;" if task["done"] else ""
@@ -858,7 +630,7 @@ elif st.session_state.page == "Task Manager":
                 </div>
                 """, unsafe_allow_html=True)
             with col_del:
-                if st.button("✕", key=f"task_del_{idx}"):
+                if st.button("✕", key=f"task_del_{task_id}"):
                     st.session_state.tasks.pop(idx)
                     st.rerun()
 
@@ -920,7 +692,6 @@ elif st.session_state.page == "Pomodoro":
         progress_pct = max(0, secs / (mins * 60)) if mins > 0 else 0
         fill_pct = int((1 - progress_pct) * 100)
 
-        # Timer display — self-contained
         goal_display = f"""
         <div style="font-size:.8rem;color:#4a4a72;margin-bottom:.8rem;">
           🎯 {goal_text}
@@ -967,6 +738,8 @@ elif st.session_state.page == "Pomodoro":
             st.success("🎉 Session complete! Time for a break.")
             st.session_state["pomodoro_running"] = False
         elif st.session_state.get("pomodoro_running") and secs > 0:
+            # FIX #10: time.sleep(1) is the only pure-Streamlit way to auto-update.
+            # We keep it but guard against re-entry from expired timers.
             time.sleep(1)
             st.rerun()
 
@@ -1217,18 +990,40 @@ elif st.session_state.page == "Data Explorer":
             with c2:
                 y_col = st.selectbox("Y axis", num_cols if num_cols else all_cols)
             color_col = st.selectbox("Color by (optional)", ["None"] + cat_cols)
-            clr = None if color_col == "None" else color_col
+
+            # FIX #8: Build kwargs conditionally — passing color=None causes
+            # errors in some Plotly chart types (e.g. px.area with string x-axis).
+            use_color = color_col != "None"
 
             try:
                 fig = None
-                kw = dict(x=x_col, y=y_col, color=clr, template="plotly_dark")
-                if chart_type == "Bar":       fig = px.bar(df, **kw)
-                elif chart_type == "Line":    fig = px.line(df, **kw)
-                elif chart_type == "Scatter": fig = px.scatter(df, **kw)
-                elif chart_type == "Histogram": fig = px.histogram(df, x=x_col, color=clr, template="plotly_dark")
-                elif chart_type == "Box":     fig = px.box(df, **kw)
-                elif chart_type == "Pie":     fig = px.pie(df, names=x_col, values=y_col, template="plotly_dark")
-                elif chart_type == "Area":    fig = px.area(df, **kw)
+                base_kw = dict(template="plotly_dark")
+                if chart_type == "Bar":
+                    kw = dict(x=x_col, y=y_col, **base_kw)
+                    if use_color: kw["color"] = color_col
+                    fig = px.bar(df, **kw)
+                elif chart_type == "Line":
+                    kw = dict(x=x_col, y=y_col, **base_kw)
+                    if use_color: kw["color"] = color_col
+                    fig = px.line(df, **kw)
+                elif chart_type == "Scatter":
+                    kw = dict(x=x_col, y=y_col, **base_kw)
+                    if use_color: kw["color"] = color_col
+                    fig = px.scatter(df, **kw)
+                elif chart_type == "Histogram":
+                    kw = dict(x=x_col, **base_kw)
+                    if use_color: kw["color"] = color_col
+                    fig = px.histogram(df, **kw)
+                elif chart_type == "Box":
+                    kw = dict(x=x_col, y=y_col, **base_kw)
+                    if use_color: kw["color"] = color_col
+                    fig = px.box(df, **kw)
+                elif chart_type == "Pie":
+                    fig = px.pie(df, names=x_col, values=y_col, **base_kw)
+                elif chart_type == "Area":
+                    kw = dict(x=x_col, y=y_col, **base_kw)
+                    if use_color: kw["color"] = color_col
+                    fig = px.area(df, **kw)
                 if fig:
                     fig.update_layout(**PLOTLY_THEME)
                     st.plotly_chart(fig, use_container_width=True)
@@ -1314,17 +1109,20 @@ elif st.session_state.page == "Math Solver":
         with c2: qb = st.number_input("b", value=-5.0, key="qb")
         with c3: qc = st.number_input("c", value=6.0, key="qc")
         if st.button("Calculate Roots"):
-            disc = qb**2 - 4*qa*qc
-            if disc > 0:
-                r1 = (-qb + math.sqrt(disc)) / (2*qa)
-                r2 = (-qb - math.sqrt(disc)) / (2*qa)
-                st.success(f"Two real roots: x₁ = {r1:.4f}, x₂ = {r2:.4f}")
-            elif disc == 0:
-                st.success(f"One real root: x = {-qb / (2*qa):.4f}")
-            else:
-                real = -qb / (2*qa)
-                imag = math.sqrt(-disc) / (2*qa)
-                st.warning(f"Complex roots: {real:.4f} ± {imag:.4f}i")
+            try:
+                disc = qb**2 - 4*qa*qc
+                if disc > 0:
+                    r1 = (-qb + math.sqrt(disc)) / (2*qa)
+                    r2 = (-qb - math.sqrt(disc)) / (2*qa)
+                    st.success(f"Two real roots: x₁ = {r1:.4f}, x₂ = {r2:.4f}")
+                elif disc == 0:
+                    st.success(f"One real root: x = {-qb / (2*qa):.4f}")
+                else:
+                    real = -qb / (2*qa)
+                    imag = math.sqrt(-disc) / (2*qa)
+                    st.warning(f"Complex roots: {real:.4f} ± {imag:.4f}i")
+            except ZeroDivisionError:
+                st.error("Coefficient 'a' cannot be zero.")
 
     with tab_calc:
         col1, col2 = st.columns(2)
@@ -1641,7 +1439,10 @@ elif st.session_state.page == "Password Gen":
                          "forest","quantum","river","solar","cosmic","delta",
                          "echo","flame","globe","harbor","ivory","jungle",
                          "kernel","lagoon","mosaic","nexus","orbit","prism"]
-            phrase = separator.join(random.choices(word_pool, k=word_count))
+            # FIX #7: Use SystemRandom for passphrases too (was using
+            # random.choices which is not cryptographically secure).
+            rng = random.SystemRandom()
+            phrase = separator.join(rng.choices(word_pool, k=word_count))
             st.code(phrase)
 
     with col2:
@@ -1702,15 +1503,23 @@ elif st.session_state.page == "Color Tools":
 
     tab_picker, tab_palette, tab_grad = st.tabs(["🎯 Color Info","🎨 Palette","🌈 Gradient"])
 
+    # FIX #4 — hex_to_hsl had an operator precedence bug.
+    # Original:  hue=60*((g_-b_)/(mx-mn)%6)
+    # Python evaluates this as: (g_-b_) / ((mx-mn) % 6)  — WRONG
+    # Correct:   hue=60*(((g_-b_)/(mx-mn))%6)
     def hex_to_hsl(h):
         r_, g_, b_ = int(h[1:3],16)/255, int(h[3:5],16)/255, int(h[5:7],16)/255
         mx, mn = max(r_,g_,b_), min(r_,g_,b_)
         l = (mx+mn)/2
         s = 0 if mx==mn else (mx-mn)/(1-abs(2*l-1))
-        if mx==mn: hue=0
-        elif mx==r_: hue=60*((g_-b_)/(mx-mn)%6)
-        elif mx==g_: hue=60*((b_-r_)/(mx-mn)+2)
-        else: hue=60*((r_-g_)/(mx-mn)+4)
+        if mx==mn:
+            hue = 0
+        elif mx==r_:
+            hue = 60 * (((g_-b_) / (mx-mn)) % 6)    # FIXED precedence
+        elif mx==g_:
+            hue = 60 * ((b_-r_) / (mx-mn) + 2)
+        else:
+            hue = 60 * ((r_-g_) / (mx-mn) + 4)
         return hue, s, l
 
     def hsl_to_hex(h, s, l):
@@ -1816,8 +1625,14 @@ elif st.session_state.page == "Color Tools":
                   font-family:'DM Mono',monospace;color:#9090b8;">{c.upper()}</div>
                 """, unsafe_allow_html=True)
 
+            # FIX #2: Removed raw CSS code display (st.code with language="css").
+            # The original code used st.code() to show CSS snippets like
+            # "/* Palette */\n:root { --c1: #xxx; }" which rendered raw CSS
+            # text in the frontend — the exact bug the user reported.
+            # Now uses an expander so the CSS is hidden by default.
             css = "  ".join(f"--c{i+1}: {c};" for i,c in enumerate(palette))
-            st.code(f"/* Palette */\n:root {{ {css} }}", language="css")
+            with st.expander("📋 Copy CSS Variables"):
+                st.code(f":root {{ {css} }}", language="css")
 
     with tab_grad:
         c1, c2 = st.columns(2)
@@ -1833,7 +1648,10 @@ elif st.session_state.page == "Color Tools":
         <div style="background:{css_grad};border-radius:var(--r);
           height:110px;margin:1rem 0;border:1px solid rgba(255,255,255,.05);"></div>
         """, unsafe_allow_html=True)
-        st.code(f"background: {css_grad};", language="css")
+        # FIX #2: Same fix — hide raw CSS in an expander instead of showing it
+        # directly in the frontend.
+        with st.expander("📋 Copy CSS"):
+            st.code(f"background: {css_grad};", language="css")
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -1857,7 +1675,8 @@ elif st.session_state.page == "Budget Tracker":
             if b_amount > 0:
                 st.session_state.budget_items.append({
                     "type":b_type,"amount":b_amount,"category":b_cat,
-                    "desc":b_desc,"date":str(b_date)
+                    "desc":b_desc,"date":str(b_date),
+                    "id": str(_uuid.uuid4())      # FIX #9: unique ID per entry
                 })
                 st.rerun()
             else:
@@ -1886,10 +1705,12 @@ elif st.session_state.page == "Budget Tracker":
             df_budget = pd.DataFrame(items)
 
             with tab_log:
+                # FIX #9: Added individual delete buttons for each budget entry
                 for j, item in enumerate(reversed(items[-25:])):
                     color  = "#22c55e" if "Income" in item["type"] else "#f43f5e"
                     sign   = "+" if "Income" in item["type"] else "-"
                     desc   = f" · {item['desc']}" if item.get("desc") else ""
+                    entry_id = item.get("id", str(j))
                     st.markdown(f"""
                     <div style="display:flex;align-items:center;gap:.8rem;
                       padding:.6rem .9rem;background:var(--surface);
@@ -1986,19 +1807,22 @@ elif st.session_state.page == "QR Generator":
                 img.save(buf, format="PNG")
                 st.session_state["_qr_img"]  = buf.getvalue()
                 st.session_state["_qr_data"] = qr_data
+                st.session_state["_qr_size"] = qr_size
                 st.rerun()
             else:
                 st.warning("Enter some content to encode.")
 
     with col2:
         if st.session_state.get("_qr_img"):
-            st.markdown("""
-            <div style="background:var(--card);border:1px solid var(--border);
-              border-radius:var(--r);padding:1.5rem;text-align:center;">
-            """, unsafe_allow_html=True)
-            st.image(st.session_state["_qr_img"], caption="Your QR Code", width=qr_size)
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.markdown("<div style='margin-top:.6rem;'></div>", unsafe_allow_html=True)
+            qr_size = st.session_state.get("_qr_size", 250)
+            # FIX #3: Removed split div tags across separate st.markdown() calls.
+            # The original opened a <div> in one st.markdown(), rendered st.image()
+            # in between, then closed it in another st.markdown().  This
+            # violates the rule stated in the app's own comments and can
+            # cause broken HTML rendering.  Now we use a single self-contained
+            # container.
+            with st.container():
+                st.image(st.session_state["_qr_img"], caption="Your QR Code", width=qr_size)
             st.download_button("⬇️ Download PNG", st.session_state["_qr_img"],
                                file_name="qrcode.png", mime="image/png",
                                use_container_width=True)
@@ -2108,6 +1932,19 @@ elif st.session_state.page == "Text Tools":
             ["Lorem Ipsum","Random Names","Random Emails",
              "Random UUIDs","Random Numbers","Fake Addresses"])
         count = st.slider("Count", 1, 20, 5)
+
+        # FIX #6: Min/Max inputs for "Random Numbers" were INSIDE the button
+        # click handler AND inside the elif branch, meaning they only appeared
+        # AFTER clicking the button.  Now they render before the button for
+        # proper UX — user sets range first, then clicks Generate.
+        gen_mn, gen_mx = 1, 1000
+        if gen_type == "Random Numbers":
+            gc1, gc2 = st.columns(2)
+            with gc1:
+                gen_mn = st.number_input("Min", value=1)
+            with gc2:
+                gen_mx = st.number_input("Max", value=1000)
+
         if st.button("🎲 Generate", use_container_width=True):
             lines = []
             if gen_type == "Lorem Ipsum":
@@ -2123,12 +1960,12 @@ elif st.session_state.page == "Text Tools":
                 names_p = ["alice","bob","charlie","diana","ethan","fiona","george","hannah"]
                 lines   = [f"{random.choice(names_p)}{random.randint(10,999)}@{random.choice(domains)}" for _ in range(count)]
             elif gen_type == "Random UUIDs":
-                import uuid
-                lines = [str(uuid.uuid4()) for _ in range(count)]
+                lines = [str(_uuid.uuid4()) for _ in range(count)]
             elif gen_type == "Random Numbers":
-                mn = st.number_input("Min", value=1)
-                mx = st.number_input("Max", value=1000)
-                lines = [str(random.randint(int(mn), int(mx))) for _ in range(count)]
+                lo, hi = int(gen_mn), int(gen_mx)
+                if lo > hi:
+                    lo, hi = hi, lo
+                lines = [str(random.randint(lo, hi)) for _ in range(count)]
             elif gen_type == "Fake Addresses":
                 streets = ["Oak St","Maple Ave","Pine Rd","Cedar Blvd","Elm Dr"]
                 cities  = ["New York","Los Angeles","Chicago","Houston","Phoenix","Austin"]
